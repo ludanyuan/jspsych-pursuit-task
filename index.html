@@ -21,12 +21,12 @@
   const TRIAL_MS = 12000;
   const W = 640, H = 400;
 
-  // Shadow arrays populated during the trial — for scoring only.
-  // The bot has no tool that reads arbitrary JS variables, so these
-  // are not a perception shortcut.
-  window._targetPath = [];
-  window._canvasRect = null;
-  window._pursuitAnimId = null;
+  // Module-scope (NOT window.*) — on_load writes, on_finish reads via shared closure.
+  // Keeping these off window prevents a DOM-inspection bot from reading the live
+  // circle position via page.evaluate() mid-trial, which would defeat both signals.
+  let _targetPath = [];
+  let _canvasRect = null;
+  let _pursuitAnimId = null;
 
   const jsPsych = initJsPsych({
     extensions: [{ type: jsPsychExtensionMouseTracking, params: { minimum_sample_time: 0 } }]
@@ -59,7 +59,7 @@
       const ctx    = canvas.getContext('2d');
 
       // Record canvas position in viewport once (stable for trial duration).
-      window._canvasRect = canvas.getBoundingClientRect();
+      _canvasRect = canvas.getBoundingClientRect();
 
       // Circle physics — random initial position and direction.
       let cx = W / 2 + (Math.random() - 0.5) * 200;
@@ -68,7 +68,7 @@
       let vx = Math.cos(angle) * SPEED;
       let vy = Math.sin(angle) * SPEED;
 
-      window._targetPath = [];
+      _targetPath = [];
       const trialStart = performance.now();
       let lastTime = null;
 
@@ -87,7 +87,7 @@
         if (cy + RADIUS > H)  { cy = H - RADIUS; vy = -Math.abs(vy); }
 
         // Shadow-record ground-truth target position for post-hoc scoring.
-        window._targetPath.push({ t: Math.round(now - trialStart), cx, cy });
+        _targetPath.push({ t: Math.round(now - trialStart), cx, cy });
 
         // Draw
         ctx.clearRect(0, 0, W, H);
@@ -99,22 +99,22 @@
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        window._pursuitAnimId = requestAnimationFrame(animate);
+        _pursuitAnimId = requestAnimationFrame(animate);
       }
 
-      window._pursuitAnimId = requestAnimationFrame(animate);
+      _pursuitAnimId = requestAnimationFrame(animate);
     },
 
     on_finish: function (data) {
       // Stop animation
-      if (window._pursuitAnimId) {
-        cancelAnimationFrame(window._pursuitAnimId);
-        window._pursuitAnimId = null;
+      if (_pursuitAnimId) {
+        cancelAnimationFrame(_pursuitAnimId);
+        _pursuitAnimId = null;
       }
 
       const moves  = (data.mouse_tracking_data || []).filter(e => e.event === 'mousemove');
-      const path   = window._targetPath || [];
-      const rect   = window._canvasRect || { left: 0, top: 0 };
+      const path   = _targetPath || [];
+      const rect   = _canvasRect || { left: 0, top: 0 };
 
       // --- distance scoring ---
       // For each mousemove event, interpolate target canvas position at that t
