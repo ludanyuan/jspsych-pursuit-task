@@ -172,6 +172,43 @@
     }
   };
 
+  // Verdict layer — grounded in n=2 human, n=1 bot (seed=1).
+  // Human: Yumi mean=20.0px max_gap~299ms; Aiden mean=20.3px max_gap~399ms.
+  // Bot seed=1: mean=282.9px max_gap=5151ms. Zero overlap on both signals.
+  // TODO: replicate with 2-3 more bot seeds before treating as production-ready
+  // alongside the latency/motion CAPTCHAs — n=1 bot is a promising but thin baseline.
+  function computeVerdict(d) {
+    const LONG_GAP_MS    = 450;  // human max observed: 399ms; bot min: 515ms; margin: 116ms
+    const MEAN_DIST_PX   = 100;  // human: 20.0/20.3px; bot: 282.9px
+
+    const rawGaps  = d.raw_gaps || [];
+    const maxGap   = rawGaps.length ? Math.max(...rawGaps) : 0;
+    const nTotal   = rawGaps.length;
+    const nLong    = d.n_long_gaps || 0;
+
+    const distFlag = (d.mean_distance || 0) > MEAN_DIST_PX;
+    const gapFlag  = maxGap >= LONG_GAP_MS;
+
+    return {
+      bot_suspected: distFlag || gapFlag,
+      method: 'continuous-pursuit',
+      signals: {
+        mean_distance_px:    d.mean_distance   != null ? +d.mean_distance.toFixed(1)  : null,
+        p90_distance_px:     d.p90_distance    != null ? +d.p90_distance.toFixed(1)   : null,
+        n_long_gaps:         nLong,
+        max_long_gap_ms:     maxGap,
+        long_gap_proportion: nTotal > 0 ? +(nLong / nTotal).toFixed(4) : null
+      },
+      flags: {
+        distance_suspicious: distFlag,
+        gap_suspicious:      gapFlag
+      },
+      thresholds_used:  { long_gap_ms: LONG_GAP_MS, mean_distance_px: MEAN_DIST_PX },
+      n_human_baseline: 2,
+      n_bot_baseline:   1
+    };
+  }
+
   var results = {
     type: jsPsychHtmlKeyboardResponse,
     // No trial_duration — waits indefinitely so #pursuit-complete persists for data extraction.
@@ -189,6 +226,8 @@
       }
 
       const d = trialData;
+      const verdict = computeVerdict(d);
+
       const rawGapsSample = (d.raw_gaps || []).slice(0, 80);
       const gapBuckets = {};
       (d.raw_gaps || []).forEach(g => {
@@ -200,6 +239,12 @@
         .map(([k,v]) => '  ' + String(k).padStart(5) + '–' + (Number(k)+49) + 'ms : ' +
              '█'.repeat(Math.min(v,40)) + ' (' + v + ')')
         .join('\n');
+
+      const verdictLine = verdict.bot_suspected
+        ? '⚠ BOT SUSPECTED  (distance=' + verdict.flags.distance_suspicious +
+          ', gap=' + verdict.flags.gap_suspicious + ')'
+        : '✓ HUMAN (clear)  (distance=' + verdict.flags.distance_suspicious +
+          ', gap=' + verdict.flags.gap_suspicious + ')';
 
       document.getElementById('pursuit-complete').innerHTML =
         '<h2>Pursuit trial complete — results</h2>' +
@@ -215,9 +260,10 @@
           (d.gap_sd_long    != null ? ', sd=' + d.gap_sd_long.toFixed(1) + 'ms' : '') + '\n' +
         '\nGAP HISTOGRAM (50ms buckets)\n' + bucketStr + '\n' +
         '\nFIRST 80 RAW GAPS (ms)\n' + rawGapsSample.join(', ') +
+        '\n\nVERDICT\n' + verdictLine +
         '</pre>';
 
-      // Machine-readable JSON for the bot harness to extract via #data
+      // Machine-readable JSON for the bot harness and record_session capture
       const metrics = {
         n_events:       d.n_events,
         mean_distance:  d.mean_distance  != null ? +d.mean_distance.toFixed(1)  : null,
@@ -227,7 +273,8 @@
         gap_mean_short: d.gap_mean_short != null ? +d.gap_mean_short.toFixed(1) : null,
         gap_mean_long:  d.gap_mean_long  != null ? +d.gap_mean_long.toFixed(1)  : null,
         gap_sd_long:    d.gap_sd_long    != null ? +d.gap_sd_long.toFixed(1)    : null,
-        raw_gaps:       d.raw_gaps || []
+        raw_gaps:       d.raw_gaps || [],
+        verdict:        verdict
       };
       document.getElementById('data').textContent = JSON.stringify(metrics);
     }
