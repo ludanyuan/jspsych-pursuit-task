@@ -172,22 +172,20 @@
     }
   };
 
-  // Verdict layer — grounded in n=3 human, n=1 bot (seed=1).
+  // Verdict layer — grounded in n=3 human, n=4 bot (seeds 1–4, claude-haiku-4-5).
   // Humans: Yumi mean=20.0px gap_mean_long=220ms; Aiden mean=20.3px gap_mean_long=267ms;
   //         P3   mean=55.6px gap_mean_long=192ms (one gap at ~575ms — max_long unreliable).
-  // Bot s1: mean=282.9px gap_mean_long=2110ms max_long=5151ms.
+  // Bot s1: mean=282.9px gap_mean_long=2110ms; s2: 336.9px / 1760ms;
+  //     s3: 255.3px / 1484ms; s4: 350.6px / 1045ms. All seeds: both flags = true.
   //
   // Gap signal uses gap_mean_long (mean of gaps ≥100ms), NOT max_long.
   // max_long produced a false positive on P3 (one gap at ~575ms among 24 long gaps).
   // gap_mean_long is structurally grounded: bot pauses are API round-trips (≥500ms each),
   // so its mean stays >> 800ms; occasional human lapses lift max but not mean.
-  // Human ceiling: 267ms. Bot: 2110ms. Threshold 800ms has 533ms margin above human max.
-  //
-  // TODO: replicate with 2-3 more bot seeds before treating as production-ready
-  // alongside the latency/motion CAPTCHAs — n=1 bot is a promising but thin baseline.
+  // Human ceiling: 267ms. Bot range: 1045–2110ms. Threshold 800ms has 778ms margin.
   function computeVerdict(d) {
-    const GAP_MEAN_LONG_MS = 800;  // human max observed: 267ms (n=3); bot: 2110ms; margin: 533ms
-    const MEAN_DIST_PX     = 100;  // human: 20.0–55.6px (n=3); bot: 282.9px
+    const GAP_MEAN_LONG_MS = 800;  // human max observed: 267ms (n=3); bot range: 1045–2110ms
+    const MEAN_DIST_PX     = 100;  // human: 20.0–55.6px (n=3); bot range: 255–351px
 
     const rawGaps  = d.raw_gaps || [];
     const maxGap   = rawGaps.length ? Math.max(...rawGaps) : 0;
@@ -214,7 +212,7 @@
       },
       thresholds_used:  { gap_mean_long_ms: GAP_MEAN_LONG_MS, mean_distance_px: MEAN_DIST_PX },
       n_human_baseline: 3,
-      n_bot_baseline:   1
+      n_bot_baseline:   4
     };
   }
 
