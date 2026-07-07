@@ -172,9 +172,9 @@
     }
   };
 
-  // Verdict layer — grounded in n=3 human, n=4 bot (seeds 1–4, claude-haiku-4-5).
+  // Verdict layer — grounded in n=4 human, n=4 bot (seeds 1–4, claude-haiku-4-5).
   // Humans: Yumi mean=20.0px gap_mean_long=220ms; Aiden mean=20.3px gap_mean_long=267ms;
-  //         P3   mean=55.6px gap_mean_long=192ms (one gap at ~575ms — max_long unreliable).
+  //         P3   mean=55.6px gap_mean_long=192ms; P4 mean=17.9px gap_mean_long=231ms.
   // Bot s1: mean=282.9px gap_mean_long=2110ms; s2: 336.9px / 1760ms;
   //     s3: 255.3px / 1484ms; s4: 350.6px / 1045ms. All seeds: both flags = true.
   //
@@ -184,8 +184,8 @@
   // so its mean stays >> 800ms; occasional human lapses lift max but not mean.
   // Human ceiling: 267ms. Bot range: 1045–2110ms. Threshold 800ms has 778ms margin.
   function computeVerdict(d) {
-    const GAP_MEAN_LONG_MS = 800;  // human max observed: 267ms (n=3); bot range: 1045–2110ms
-    const MEAN_DIST_PX     = 100;  // human: 20.0–55.6px (n=3); bot range: 255–351px
+    const GAP_MEAN_LONG_MS = 800;  // human max observed: 267ms (n=4); bot range: 1045–2110ms
+    const MEAN_DIST_PX     = 100;  // human: 17.9–55.6px (n=4); bot range: 255–351px
 
     const rawGaps  = d.raw_gaps || [];
     const maxGap   = rawGaps.length ? Math.max(...rawGaps) : 0;
@@ -211,7 +211,7 @@
         gap_suspicious:      gapFlag
       },
       thresholds_used:  { gap_mean_long_ms: GAP_MEAN_LONG_MS, mean_distance_px: MEAN_DIST_PX },
-      n_human_baseline: 3,
+      n_human_baseline: 4,
       n_bot_baseline:   4
     };
   }
